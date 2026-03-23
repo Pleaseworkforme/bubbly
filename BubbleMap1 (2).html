@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bubble Map</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #eef4ff 0%, #f8fbff 100%);
+      color: #1f2937;
+      min-height: 100vh;
+    }
+
+    /* ── LOGIN / SUBMIT SCREEN ── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #eef4ff 0%, #e0e7ff 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .overlay.hidden { display: none; }
+
+    .form-card {
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(148,163,184,0.2);
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(15,23,42,0.1);
+      padding: 36px 32px;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .form-card h2 {
+      margin: 0 0 6px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .form-card .subtitle {
+      margin: 0 0 24px;
+      color: #64748b;
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .form-field {
+      margin-bottom: 16px;
+    }
+
+    .form-field label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .form-field input {
+      width: 100%;
+      border: 1px solid #dbe3ef;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 15px;
+      background: #fbfdff;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-field input:focus {
+      border-color: #7c9cff;
+      box-shadow: 0 0 0 4px rgba(124,156,255,0.15);
+    }
+
+    .form-error {
+      color: #ef4444;
+      font-size: 0.84rem;
+      margin-top: 6px;
+      min-height: 20px;
+    }
+
+    .submit-btn {
+      width: 100%;
+      border: none;
+      border-radius: 14px;
+      padding: 13px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: white;
+      box-shadow: 0 10px 24px rgba(59,130,246,0.25);
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+      margin-top: 8px;
+    }
+
+    .submit-btn:hover { transform: translateY(-1px); }
+
+    .hidden { display: none !important; }
+
+    /* ── MAIN PAGE ── */
+    .page {
+      max-width: 1200px;
+      margin: 28px auto;
+      padding: 0 18px;
+    }
+
+    .header { margin-bottom: 18px; }
+
+    .header h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+
+    .header p {
+      margin: 0;
+      color: #475569;
+      line-height: 1.5;
+      font-size: 0.98rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .layout.map-only {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(148,163,184,0.2);
+      border-radius: 22px;
+      box-shadow: 0 14px 40px rgba(15,23,42,0.08);
+    }
+
+    .sidebar { padding: 18px; }
+
+    .section-title {
+      margin: 0 0 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    /* ── DATA TABLE ── */
+    .table-wrap {
+      max-height: 340px;
+      overflow-y: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #f1f5f9;
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 700;
+      color: #0f172a;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    tbody td {
+      padding: 9px 12px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+    }
+
+    tbody tr:hover { background: #f8fafc; }
+
+    .count-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: white;
+      font-weight: 700;
+      font-size: 0.78rem;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .stat-box {
+      flex: 1;
+      min-width: 100px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-box .num {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .stat-box .label {
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      border-radius: 14px;
+      padding: 11px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+
+    .primary {
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: white;
+      box-shadow: 0 10px 24px rgba(59,130,246,0.25);
+    }
+
+    .secondary { background: #eef2ff; color: #3730a3; }
+    .danger { background: #fef2f2; color: #dc2626; }
+
+    .status {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+      font-size: 0.92rem;
+      line-height: 1.45;
+      min-height: 48px;
+      white-space: pre-line;
+    }
+
+    .map-card { padding: 12px; }
+
+    #map {
+      width: 100%;
+      height: 720px;
+      border-radius: 18px;
+      overflow: hidden;
+    }
+
+    .legend {
+      background: rgba(255,255,255,0.95);
+      padding: 12px 14px;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(15,23,42,0.15);
+      border: 1px solid rgba(148,163,184,0.2);
+      line-height: 1.35;
+    }
+
+    .legend-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #0f172a;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #334155;
+      margin: 6px 0;
+    }
+
+    .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 2px solid #000;
+      opacity: 0.65;
+      flex: 0 0 14px;
+    }
+
+    .bubble-popup {
+      font-family: Inter, system-ui, sans-serif;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .bubble-popup .title {
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    .leaflet-popup-content-wrapper { border-radius: 14px; }
+
+    .main-app { display: none; }
+    .main-app.visible { display: block; }
+
+    /* ── USER BANNER ── */
+    .user-banner {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      text-align: center;
+      padding: 14px 20px;
+      border-radius: 16px;
+      margin-bottom: 18px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      box-shadow: 0 8px 24px rgba(16,185,129,0.2);
+    }
+
+    @media (max-width: 950px) {
+      .layout { grid-template-columns: 1fr; }
+      #map { height: 560px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SCREEN 1: EMAIL + LOCATION FORM -->
+  <div id="formOverlay" class="overlay">
+    <div class="form-card" id="inputCard">
+      <h2>Pin Your Location</h2>
+      <p class="subtitle">Enter your email and location to add yourself to the world map.</p>
+
+      <div class="form-field">
+        <label for="emailInput">Email</label>
+        <input id="emailInput" type="text" placeholder="you@example.com" autocomplete="email" />
+      </div>
+
+      <div class="form-field">
+        <label for="locationInput">Your Location</label>
+        <input id="locationInput" type="text" placeholder="e.g. Tokyo, Japan" />
+      </div>
+
+      <div class="form-error" id="formError"></div>
+
+      <button class="submit-btn" id="formSubmitBtn">Submit</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: MAP (everyone) + ADMIN PANEL (admin only) -->
+  <div class="main-app" id="mainApp">
+    <div class="page">
+      <div class="header">
+        <h1 id="pageTitle">World Bubble Map</h1>
+        <p id="pageSubtitle">See where everyone is located around the world.</p>
+      </div>
+
+      <div class="user-banner" id="userBanner">
+        Your location has been added! The map below shows all submissions.
+      </div>
+
+      <div class="layout" id="mainLayout">
+
+        <!-- ADMIN SIDEBAR -->
+        <div class="card sidebar" id="adminSidebar">
+          <div class="section-title">Submissions</div>
+
+          <div class="stats">
+            <div class="stat-box">
+              <div class="num" id="totalSubs">0</div>
+              <div class="label">Total Submissions</div>
+            </div>
+            <div class="stat-box">
+              <div class="num" id="uniqueLocs">0</div>
+              <div class="label">Unique Locations</div>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Email</th>
+                  <th>Location</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="dataBody"></tbody>
+            </table>
+          </div>
+
+          <div class="section-title" style="margin-top:18px;">Location Counts</div>
+
+          <div class="table-wrap" style="max-height:200px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Location</th>
+                  <th>Count</th>
+                </tr>
+              </thead>
+              <tbody id="countBody"></tbody>
+            </table>
+          </div>
+
+          <div class="buttons">
+            <button class="primary" id="plotBtn">Re-Plot Map</button>
+            <button class="secondary" id="exportBtn">Export CSV</button>
+            <button class="danger" id="clearDataBtn">Clear All Data</button>
+          </div>
+
+          <div id="status" class="status">Ready.</div>
+        </div>
+
+        <!-- MAP -->
+        <div class="card map-card">
+          <div id="map"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <script>
+    /* DATA STORAGE */
+    const STORAGE_KEY = "bubblemap_submissions";
+
+    function getSubmissions() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveSubmissions(data) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function addSubmission(email, location) {
+      const subs = getSubmissions();
+      subs.push({ email, location, time: new Date().toLocaleString() });
+      saveSubmissions(subs);
+    }
+
+    /* FORM LOGIC */
+    const formOverlay  = document.getElementById("formOverlay");
+    const mainApp      = document.getElementById("mainApp");
+    const emailInput   = document.getElementById("emailInput");
+    const locationInput= document.getElementById("locationInput");
+    const formError    = document.getElementById("formError");
+    const adminSidebar = document.getElementById("adminSidebar");
+    const mainLayout   = document.getElementById("mainLayout");
+    const userBanner   = document.getElementById("userBanner");
+    const pageTitle    = document.getElementById("pageTitle");
+    const pageSubtitle = document.getElementById("pageSubtitle");
+
+    let isAdmin = false;
+
+    document.getElementById("formSubmitBtn").addEventListener("click", () => {
+      const email    = emailInput.value.trim();
+      const location = locationInput.value.trim();
+
+      formError.textContent = "";
+
+      if (email.toLowerCase() === "e") {
+        isAdmin = true;
+        showApp();
+        return;
+      }
+
+      if (!email)    { formError.textContent = "Please enter your email.";    return; }
+      if (!location) { formError.textContent = "Please enter your location."; return; }
+
+      addSubmission(email, location);
+      isAdmin = false;
+      showApp();
+    });
+
+    [emailInput, locationInput].forEach(el => {
+      el.addEventListener("keydown", e => {
+        if (e.key === "Enter") document.getElementById("formSubmitBtn").click();
+      });
+    });
+
+    function showApp() {
+      formOverlay.classList.add("hidden");
+      mainApp.classList.add("visible");
+
+      if (isAdmin) {
+        adminSidebar.classList.remove("hidden");
+        mainLayout.classList.remove("map-only");
+        userBanner.classList.add("hidden");
+        pageTitle.textContent    = "Admin — Bubble Map";
+        pageSubtitle.textContent = "All submitted locations and data are shown below.";
+      } else {
+        adminSidebar.classList.add("hidden");
+        mainLayout.classList.add("map-only");
+        userBanner.classList.remove("hidden");
+        pageTitle.textContent    = "World Bubble Map";
+        pageSubtitle.textContent = "See where everyone is located around the world.";
+      }
+
+      initMap();
+    }
+
+    /* MAP */
+    let mapInstance, bubbleLayer, legendControl;
+
+    function initMap() {
+      mapInstance = L.map("map", { zoomControl: true }).setView([20, 0], 2);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(mapInstance);
+
+      bubbleLayer = L.layerGroup().addTo(mapInstance);
+
+      if (isAdmin) refreshTables();
+      plotMap();
+    }
+
+    const colors = [
+      "#ef4444","#f59e0b","#10b981","#3b82f6",
+      "#8b5cf6","#ec4899","#14b8a6","#f97316"
+    ];
+
+    function getColor(i) { return colors[i % colors.length]; }
+
+    function getLocationCounts() {
+      const subs = getSubmissions();
+      const countMap   = {};
+      const displayName = {};
+
+      for (const sub of subs) {
+        const key = sub.location.toLowerCase();
+        if (!countMap[key]) { countMap[key] = 0; displayName[key] = sub.location; }
+        countMap[key]++;
+      }
+
+      return Object.keys(countMap).map(key => ({
+        location: displayName[key],
+        amount:   countMap[key]
+      }));
+    }
+
+    function refreshTables() {
+      const subs   = getSubmissions();
+      const counts = getLocationCounts();
+
+      document.getElementById("totalSubs").textContent  = subs.length;
+      document.getElementById("uniqueLocs").textContent = counts.length;
+
+      const dataBody = document.getElementById("dataBody");
+      dataBody.innerHTML = "";
+      subs.forEach((s, i) => {
+        dataBody.innerHTML += `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${escapeHtml(s.email)}</td>
+            <td>${escapeHtml(s.location)}</td>
+            <td>${escapeHtml(s.time)}</td>
+          </tr>`;
+      });
+
+      const countBody = document.getElementById("countBody");
+      countBody.innerHTML = "";
+      [...counts].sort((a, b) => b.amount - a.amount).forEach(c => {
+        countBody.innerHTML += `
+          <tr>
+            <td>${escapeHtml(c.location)}</td>
+            <td><span class="count-badge">${c.amount}</span></td>
+          </tr>`;
+      });
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    async function geocodeLocation(location) {
+      const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=" +
+                  encodeURIComponent(location);
+      const response = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error(`Failed to geocode ${location}`);
+      const data = await response.json();
+      if (!data.length) return null;
+      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), displayName: data[0].display_name };
+    }
+
+    function scaleRadius(value, minVal, maxVal, minR, maxR) {
+      if (minVal === maxVal) return (minR + maxR) / 2;
+      return minR + ((value - minVal) / (maxVal - minVal)) * (maxR - minR);
+    }
+
+    function clearLegend() {
+      if (legendControl) { mapInstance.removeControl(legendControl); legendControl = null; }
+    }
+
+    function addLegend(rows) {
+      clearLegend();
+      const top = [...rows].sort((a, b) => b.amount - a.amount).slice(0, 6);
+
+      legendControl = L.control({ position: "bottomright" });
+      legendControl.onAdd = function () {
+        const div = L.DomUtil.create("div", "legend");
+        let html = `<div class="legend-title">Locations (by count)</div>`;
+        top.forEach(row => {
+          const idx = rows.findIndex(r => r.location === row.location);
+          html += `
+            <div class="legend-item">
+              <span class="legend-color" style="background:${getColor(idx)};"></span>
+              <span>${row.location} — ${row.amount}</span>
+            </div>`;
+        });
+        if (rows.length > 6) {
+          html += `<div class="legend-item" style="margin-top:8px;color:#64748b;">+ ${rows.length - 6} more</div>`;
+        }
+        div.innerHTML = html;
+        return div;
+      };
+      legendControl.addTo(mapInstance);
+    }
+
+    async function plotMap() {
+      const statusEl = document.getElementById("status");
+      bubbleLayer.clearLayers();
+      clearLegend();
+
+      const rows = getLocationCounts();
+      if (!rows.length) { if (statusEl) statusEl.textContent = "No submissions yet."; return; }
+
+      const amounts  = rows.map(r => r.amount);
+      const minAmt   = Math.min(...amounts);
+      const maxAmt   = Math.max(...amounts);
+      const bounds   = [];
+      const failures = [];
+      const succRows = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (statusEl) statusEl.textContent = `Geocoding ${i + 1} of ${rows.length}: ${row.location} (${row.amount})`;
+
+        try {
+          const result = await geocodeLocation(row.location);
+          if (!result) { failures.push(row.location); continue; }
+
+          const radius = scaleRadius(row.amount, minAmt, maxAmt, 10, 38);
+          const fill   = getColor(i);
+
+          const circle = L.circleMarker([result.lat, result.lon], {
+            radius,
+            fillColor:   fill,
+            fillOpacity: 0.42,
+            color:       "#000000",
+            weight:      2,
+            opacity:     0.9
+          });
+
+          circle.bindPopup(`
+            <div class="bubble-popup">
+              <div class="title">${row.location}</div>
+              <div><strong>Responses:</strong> ${row.amount}</div>
+              <div><strong>Matched:</strong> ${result.displayName}</div>
+            </div>`);
+
+          circle.on("mouseover", function () { this.setStyle({ weight: 3, fillOpacity: 0.58 }); });
+          circle.on("mouseout",  function () { this.setStyle({ weight: 2, fillOpacity: 0.42 }); });
+
+          circle.addTo(bubbleLayer);
+          bounds.push([result.lat, result.lon]);
+          succRows.push(row);
+        } catch {
+          failures.push(row.location);
+        }
+      }
+
+      if (bounds.length)    mapInstance.fitBounds(bounds, { padding: [40, 40] });
+      if (succRows.length)  addLegend(succRows);
+
+      if (statusEl) {
+        let msg = `Done. ${succRows.length} location(s) from ${amounts.reduce((a, b) => a + b, 0)} total submissions.`;
+        if (failures.length) msg += `\nCould not geocode: ${failures.join(", ")}`;
+        statusEl.textContent = msg;
+      }
+    }
+
+    function exportCSV() {
+      const subs = getSubmissions();
+      if (!subs.length) { alert("No data to export."); return; }
+
+      let csv = "Email,Location,Time\n";
+      subs.forEach(s => {
+        csv += `"${s.email.replace(/"/g,'""')}","${s.location.replace(/"/g,'""')}","${s.time}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = "bubble_map_data.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById("plotBtn").addEventListener("click", () => { refreshTables(); plotMap(); });
+    document.getElementById("exportBtn").addEventListener("click", exportCSV);
+    document.getElementById("clearDataBtn").addEventListener("click", () => {
+      if (confirm("Are you sure you want to delete ALL submissions? This cannot be undone.")) {
+        saveSubmissions([]);
+        refreshTables();
+        bubbleLayer.clearLayers();
+        clearLegend();
+        document.getElementById("status").textContent = "All data cleared.";
+      }
+    });
+  </script>
+</body>
+</html>
